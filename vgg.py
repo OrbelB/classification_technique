@@ -7,30 +7,19 @@ import matplotlib.pyplot as plt
 
 
 train_ds = tf.keras.utils.image_dataset_from_directory(
-  '/Users/marvinharootoonyan/ct_541/classification_technique/Images/',
-  validation_split=0.7,
-  subset="training",
+  '/Users/marvinharootoonyan/ct_541/classification_technique/TrainImages/',
   seed=123,
   image_size=(224, 224),
   batch_size=64)
-
 test_ds = tf.keras.utils.image_dataset_from_directory(
-  '/Users/marvinharootoonyan/ct_541/classification_technique/Images/',
-  validation_split=0.2,
-  subset="test",
+  '/Users/marvinharootoonyan/ct_541/classification_technique/TestImages/',
   seed=123,
   image_size=(224, 224),
   batch_size=64)
 
-val_ds = tf.keras.utils.image_dataset_from_directory(
-  '/Users/marvinharootoonyan/ct_541/classification_technique/Images/',
-  validation_split=0.1,
-  subset="validation",
-  seed=123,
-  image_size=(224, 224),
-  batch_size=64)
 
-(images,labels) = val_ds
 
-print(labels)
-
+print(len(train_ds.class_names))
+print(len(test_ds.class_names))
+train_labels = to_categorical(train_ds.class_names, num_classes=len(train_ds.class_names))
+test_labels = to_categorical(test_ds.class_names, num_classes=len(test_ds.class_names))
