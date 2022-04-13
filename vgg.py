@@ -27,10 +27,6 @@ test_ds = tf.keras.utils.image_dataset_from_directory(
 
 
 train_labels = np.concatenate([y for x, y in train_ds], axis=0)
-print(train_labels)
-print(len(train_labels))
-
-# print(len(test_ds.class_names))
-# print(train_ds.class_names)
-# train_labels = to_categorical(train_ds.class_names, num_classes=len(train_ds.class_names))
-# test_labels = to_categorical(test_ds.class_names, num_classes=len(test_ds.class_names))
+test_labels = np.concatenate([y for x, y in test_ds], axis=0)
+train_labels = to_categorical(train_labels, num_classes=len(train_ds.class_names))
+test_labels = to_categorical(test_labels, num_classes=len(test_ds.class_names))
