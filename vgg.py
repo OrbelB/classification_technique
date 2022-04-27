@@ -51,12 +51,10 @@ base_model.summary()
 flatten_layer = layers.Flatten()
 dense_layer_1 = layers.Dense(50, activation='relu')
 dense_layer_2 = layers.Dense(20, activation='relu')
-<<<<<<< HEAD
 prediction_layer = layers.Dense(120, activation='softmax')
-=======
 prediction_layer = layers.Dense(5, activation='softmax')
 
->>>>>>> bcnn started
+
 
 model = models.Sequential([
     base_model,
@@ -65,22 +63,3 @@ model = models.Sequential([
     dense_layer_2,
     prediction_layer
 ])
-<<<<<<< HEAD
-
-
-# model.compile(
-#     optimizer='adam',
-#     loss='categorical_crossentropy',
-#     metrics=['accuracy'],
-# )
-base_learning_rate = 0.0001
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),
-              loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-              metrics=['accuracy'])
-
-
-es = EarlyStopping(monitor='val_accuracy', mode='max', patience=500,  restore_best_weights=True)
-
-model.fit(train_ds, train_labels, epochs=50, validation_split=0.2, batch_size=32, callbacks=[es])
-=======
->>>>>>> bcnn started
