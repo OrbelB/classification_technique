@@ -129,6 +129,7 @@ train_generator = train_datagen.flow_from_directory(
         subset='training',
         seed=123,
         class_mode='categorical')
+        
 val_generator = train_datagen.flow_from_directory(
         TRAIN_DIR,
         target_size=(150, 150),
