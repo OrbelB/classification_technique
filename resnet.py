@@ -26,12 +26,12 @@ print("Number of training samples: %d" % tf.data.experimental.cardinality(ds_tra
 print("Number of test samples: %d" % tf.data.experimental.cardinality(ds_test))
 print("Number of classes: %d" % NUM_CLASSES)
 
-plt.figure(figsize=(10, 10))
-for i, (image, label) in enumerate(ds_train.take(9)):
-    ax = plt.subplot(3, 3, i + 1)
-    plt.imshow(image)
-    plt.title(int(label))
-    plt.axis("off")
+# plt.figure(figsize=(10, 10))
+# for i, (image, label) in enumerate(ds_train.take(9)):
+#     ax = plt.subplot(3, 3, i + 1)
+#     plt.imshow(image)
+#     plt.title(int(label))
+#     plt.axis("off")
 
 
 IMG_SIZE = 224
@@ -61,6 +61,7 @@ base_model = tf.keras.applications.ResNet50(
     weights="imagenet", include_top=False, input_tensor=inputs
 )
 x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+x = tf.keras.layers.Dense(NUM_CLASSES, activation='relu')(x)
 x = tf.keras.layers.Dropout(0.5)(x)
 outputs = tf.keras.layers.Dense(NUM_CLASSES)(x)
  
@@ -68,8 +69,11 @@ model = tf.keras.Model(inputs, outputs)
 
 base_model.trainable = False
 
+MODEL_PATH = "resnet-dogs"
+checkpoint_path = os.path.join("~/Desktop", MODEL_PATH, "save_at_{epoch}")
+
 callbacks = [
-    #tf.keras.callbacks.ModelCheckpoint(checkpoint_path),
+    tf.keras.callbacks.ModelCheckpoint(checkpoint_path),
     #tf.keras.callbacks.TensorBoard(log_dir=tensorboard_path, histogram_freq=1),
     tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
 ]
@@ -80,6 +84,13 @@ model.compile(
     loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
     metrics=["accuracy"],
 )
+
 test_data = ds_test
-model.evaluate(test_data)
+epochs=20
+train_data = ds_train
+model.fit(
+    train_data, epochs=epochs, callbacks=callbacks, validation_data=test_data, verbose=2
+)
+model.save('/model_bin')
+print(model.evaluate(test_data))
 
