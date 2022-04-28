@@ -91,6 +91,7 @@ train_data = ds_train
 model.fit(
     train_data, epochs=epochs, callbacks=callbacks, validation_data=test_data, verbose=2
 )
-model.save('/model_bin')
+model_bin_path = os.path.join("model_bin")
+model.save(model_bin_path)
 print(model.evaluate(test_data))
 
