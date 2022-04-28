@@ -3,8 +3,4 @@ TrainImages
 Images
 .env
 model_bin
-<<<<<<< HEAD
-**/resnet-dogs/
-=======
 resnet-dogs
->>>>>>> 82ee70ce2eec35dd7199c391eb82c68abe19d17e
