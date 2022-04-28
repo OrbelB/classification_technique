@@ -61,7 +61,7 @@ base_model = tf.keras.applications.ResNet50(
     weights="imagenet", include_top=False, input_tensor=inputs
 )
 x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
-x = tf.keras.layers.Dense(NUM_CLASSES, activation='relu')(x)
+# x = tf.keras.layers.Dense(NUM_CLASSES, activation='relu')(x)
 x = tf.keras.layers.Dropout(0.5)(x)
 outputs = tf.keras.layers.Dense(NUM_CLASSES)(x)
  
@@ -70,7 +70,7 @@ model = tf.keras.Model(inputs, outputs)
 base_model.trainable = False
 
 MODEL_PATH = "resnet-dogs"
-checkpoint_path = os.path.join("~/Desktop", MODEL_PATH, "save_at_{epoch}")
+checkpoint_path = os.path.join(MODEL_PATH, "save_at_{epoch}")
 
 callbacks = [
     tf.keras.callbacks.ModelCheckpoint(checkpoint_path),
@@ -91,6 +91,7 @@ train_data = ds_train
 model.fit(
     train_data, epochs=epochs, callbacks=callbacks, validation_data=test_data, verbose=2
 )
-model.save('/model_bin')
+model_bin_path = os.path.join("model_bin")
+model.save(model_bin_path)
 print(model.evaluate(test_data))
 
