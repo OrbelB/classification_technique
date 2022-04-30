@@ -57,8 +57,18 @@ ds_test = ds_test.map(input_preprocess)
 ds_test = ds_test.batch(batch_size=BATCH_SIZE, drop_remainder=True)
 
 inputs = tf.keras.layers.Input(shape=(IMG_SIZE, IMG_SIZE, 3))
+data_augmentation = keras.Sequential(
+  [
+    layers.RandomFlip("horizontal",
+                      input_shape=(IMG_SIZE,
+                                  IMG_SIZE,
+                                  3)),
+    layers.RandomRotation(0.1),
+    layers.RandomZoom(0.1),
+  ]
+)
 base_model = tf.keras.applications.ResNet50(
-    weights="imagenet", include_top=False, input_tensor=inputs
+    weights="imagenet", include_top=False, input_tensor=data_augmentation(inputs)
 )
 x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
 # x = tf.keras.layers.Dense(NUM_CLASSES, activation='relu')(x)
@@ -88,10 +98,12 @@ model.compile(
 test_data = ds_test
 epochs=20
 train_data = ds_train
-model.fit(
+history = model.fit(
     train_data, epochs=epochs, callbacks=callbacks, validation_data=test_data, verbose=2
 )
+
+np.save('resnet_history.npy',history.history)
+
 model_bin_path = os.path.join("model_bin")
 model.save(model_bin_path)
-print(model.evaluate(test_data))
 
