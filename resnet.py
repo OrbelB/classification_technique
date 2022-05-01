@@ -56,26 +56,26 @@ ds_train = ds_train.prefetch(tf.data.experimental.AUTOTUNE)
 ds_test = ds_test.map(input_preprocess)
 ds_test = ds_test.batch(batch_size=BATCH_SIZE, drop_remainder=True)
 
-inputs = tf.keras.layers.Input(shape=(IMG_SIZE, IMG_SIZE, 3))
-data_augmentation = keras.Sequential(
-  [
-    layers.RandomFlip("horizontal",
+inputs = layers.Input(shape=(IMG_SIZE, IMG_SIZE, 3))
+inputs = layers.RandomFlip("horizontal",
                       input_shape=(IMG_SIZE,
                                   IMG_SIZE,
-                                  3)),
-    layers.RandomRotation(0.1),
-    layers.RandomZoom(0.1),
-  ]
-)
+                                  3))(inputs)
+inputs = layers.RandomRotation(0.1)(inputs)
+inputs = layers.Rescaling(1./255)(inputs)
+
 base_model = tf.keras.applications.ResNet50(
-    weights="imagenet", include_top=False, input_tensor=data_augmentation(inputs)
+    weights="imagenet", include_top=False, input_tensor=inputs
 )
 x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
 # x = tf.keras.layers.Dense(NUM_CLASSES, activation='relu')(x)
-x = tf.keras.layers.Dropout(0.5)(x)
+x = tf.keras.layers.Dropout(0.2)(x)
 outputs = tf.keras.layers.Dense(NUM_CLASSES)(x)
- 
+
+
+
 model = tf.keras.Model(inputs, outputs)
+model.summary()
 
 base_model.trainable = False
 
@@ -84,7 +84,6 @@ checkpoint_path = os.path.join(MODEL_PATH, "save_at_{epoch}")
 
 callbacks = [
     tf.keras.callbacks.ModelCheckpoint(checkpoint_path),
-    #tf.keras.callbacks.TensorBoard(log_dir=tensorboard_path, histogram_freq=1),
     tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
 ]
 
