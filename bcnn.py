@@ -1,200 +1,109 @@
-# import tensorflow_datasets as tfds
-from random import shuffle
-from tensorflow.keras.utils import to_categorical
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import numpy as np
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.preprocessing import image
-from dotenv import load_dotenv
-load_dotenv()
+import tensorflow_datasets as tfds
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Lambda, Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications.vgg16 import VGG16
 import os
+import datetime
+import numpy as np
 
-def dot_product(x):
-    return keras.backend.batch_dot(x[0], x[1], axes=[1,1]) / x[0].get_shape().as_list()[1] 
 
-def signed_sqrt(x):
-    return keras.backend.sign(x) * keras.backend.sqrt(keras.backend.abs(x) + 1e-9)
 
-def L2_norm(x, axis=-1):
-    return keras.backend.l2_normalize(x, axis=axis)
-
-def build_model():
-    tensor_input = keras.layers.Input(shape=[150,150,3])
-
-#   load pre-trained model
-    tensor_input = keras.layers.Input(shape=[150,150,3])
+def outer_product(x):
+    #Einstein Notation  [batch,1,1,depth] x [batch,1,1,depth] -> [batch,depth,depth]
+    phi_I = tf.einsum('ijkm,ijkn->imn',x[0],x[1])
     
-
+    # Reshape from [batch_size,depth,depth] to [batch_size, depth*depth]
+    phi_I = tf.reshape(phi_I,[-1,x[0].shape[3]*x[1].shape[3]])
     
-    model_detector = keras.applications.vgg16.VGG16(
-                            input_tensor=tensor_input, 
-                            include_top=False,
-                            weights='imagenet')
+    # Divide by feature map size [sizexsize]
+    size1 = int(x[1].shape[1])
+    size2 = int(x[1].shape[2])
+    phi_I = tf.divide(phi_I, size1*size2)
     
-    model_detector2 = keras.applications.vgg16.VGG16(
-                            input_tensor=tensor_input, 
-                            include_top=False,
-                            weights='imagenet')
+    # Take signed square root of phi_I
+    y_ssqrt = tf.multiply(tf.sign(phi_I),tf.sqrt(tf.abs(phi_I)+1e-12))
     
-    
-    model_detector2 = keras.models.Sequential(layers=model_detector2.layers)
-  
-    for i, layer in enumerate(model_detector2.layers):
-        layer._name = layer.name  +"_second"
+    # Apply l2 normalization
+    z_l2 = tf.nn.l2_normalize(y_ssqrt, dim=1)
+    return z_l2
 
-    model2 = keras.models.Model(inputs=[tensor_input], outputs = [model_detector2.layers[-1].output])
-                       
-    x = model_detector.layers[17].output
-    z = model_detector.layers[17].output_shape
-    y = model2.layers[17].output
-    
-    print(model_detector.summary())
-    
-    print(model2.summary())
-#   rehape to (batch_size, total_pixels, filter_size)
-    x = keras.layers.Reshape([z[1] * z[2] , z[-1]])(x)
-        
-    y = keras.layers.Reshape([z[1] * z[2] , z[-1]])(y)
-    
-#   outer products of x, y
-    x = keras.layers.Lambda(dot_product)([x, y])
-    
-#   rehape to (batch_size, filter_size_vgg_last_layer*filter_vgg_last_layer)
-    x = keras.layers.Reshape([z[-1]*z[-1]])(x)
-        
-#   signed_sqrt
-    x = keras.layers.Lambda(signed_sqrt)(x)
-        
-#   L2_norm
-    x = keras.layers.Lambda(L2_norm)(x)
+(ds_train, ds_test), metadata = tfds.load(
+    "stanford_dogs",
+    split=["train", "test"],
+    shuffle_files=True,
+    with_info=True,
+    as_supervised=True,
+)
+ 
+NUM_CLASSES = metadata.features["label"].num_classes
 
-#   FC-Layer
+print("Number of training samples: %d" % tf.data.experimental.cardinality(ds_train))
+print("Number of test samples: %d" % tf.data.experimental.cardinality(ds_test))
+print("Number of classes: %d" % NUM_CLASSES)
 
-    initializer = tf.keras.initializers.GlorotNormal()
-            
-    x = keras.layers.Dense(units=120, 
-                           kernel_regularizer=keras.regularizers.l2(0.0),
-                           kernel_initializer=initializer)(x)
+IMG_SIZE = 224
+BATCH_SIZE = 64
+BUFFER_SIZE = 2
+ 
+size = (IMG_SIZE, IMG_SIZE)
+ds_train = ds_train.map(lambda image, label: (tf.image.resize(image, size), label))
+ds_test = ds_test.map(lambda image, label: (tf.image.resize(image, size), label))
+ 
+def input_preprocess(image, label):
+    image = tf.keras.applications.vgg16.preprocess_input(image)
+    return image, label
 
-    tensor_prediction = keras.layers.Activation("softmax")(x)
+ds_train = ds_train.map(
+    input_preprocess, num_parallel_calls=tf.data.experimental.AUTOTUNE
+)
+ 
+ds_train = ds_train.batch(batch_size=BATCH_SIZE, drop_remainder=True)
+ds_train = ds_train.prefetch(tf.data.experimental.AUTOTUNE)
+ 
+ds_test = ds_test.map(input_preprocess)
+ds_test = ds_test.batch(batch_size=BATCH_SIZE, drop_remainder=True)
 
-    model_bilinear = keras.models.Model(inputs=[tensor_input],
-                                        outputs=[tensor_prediction])
-    
-    
-#   Freeze VGG layers
-    for layer in model_detector.layers:
-        layer.trainable = False
-        
+inputs = Input(shape=(IMG_SIZE, IMG_SIZE, 3))
+base_model1 = VGG16(weights='imagenet', include_top=False, input_tensor=inputs)
+base_model1.trainable = False
+conv=base_model1.get_layer('block5_pool').output
+d1 = Dropout(0.5)(conv)
+d2 = Dropout(0.5)(conv)
 
-    sgd = keras.optimizers.SGD(lr=1.0, 
-                               decay=0.0,
-                               momentum=0.9)
+x = Lambda(outer_product, name='outer_product')([d1,d2])
+predictions=Dense(NUM_CLASSES, activation='softmax', name='predictions')(x)
 
-    model_bilinear.compile(loss="categorical_crossentropy", 
-                           optimizer=sgd,
-                           metrics=["categorical_accuracy"])
-
-    model_bilinear.summary()
-    
-    return model_bilinear
+model = Model(inputs=base_model1.inputs, outputs=predictions)
 
 
 
-## Loading images and labels
+MODEL_PATH = "bcnn-dogs"
+checkpoint_path = os.path.join(MODEL_PATH, "save_at_{epoch}")
 
-TRAIN_DIR = os.environ.get('TRAIN_DIR')
-TEST_DIR = os.environ.get('TEST_DIR')
+callbacks = [
+    tf.keras.callbacks.ModelCheckpoint(checkpoint_path),
+    tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
+]
 
-train_datagen = image.ImageDataGenerator(
-        rotation_range=40,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        fill_mode='nearest',
-        rescale=1./255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        validation_split=0.2,
-        horizontal_flip=True)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
+model.compile(
+    optimizer=optimizer,
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+    metrics=["accuracy"],
+)
 
-test_datagen = image.ImageDataGenerator(rescale=1./255)
+test_data = ds_test
+epochs=20
+train_data = ds_train
+model.summary()
+history = model.fit(
+    train_data, epochs=epochs, callbacks=callbacks, validation_data=test_data, verbose=2
+)
 
-train_generator = train_datagen.flow_from_directory(
-        TRAIN_DIR,
-        target_size=(150, 150),
-        color_mode="rgb",
-        batch_size=32,
-        subset='training',
-        seed=123,
-        class_mode='categorical')
-        
-val_generator = train_datagen.flow_from_directory(
-        TRAIN_DIR,
-        target_size=(150, 150),
-        color_mode="rgb",
-        batch_size=32,
-        subset='validation',
-        seed=123,
-        class_mode='categorical')
+np.save('bcnn_history.npy',history.history)
 
-test_generator = test_datagen.flow_from_directory(
-        TEST_DIR,
-        target_size=(150, 150),
-        color_mode="rgb",
-        shuffle = False,
-        class_mode=None,
-        batch_size=1)
-
-
-# class_names = train_generator.class_names;
-# (train_images, train_labels) = train_generator;
-
-# plt.figure(figsize=(10,10))
-# for i in range(25):
-#     plt.subplot(5,5,i+1)
-#     plt.xticks([])
-#     plt.yticks([])
-#     plt.grid(False)
-#     plt.imshow(train_images[i])
-#     # The CIFAR labels happen to be arrays, 
-#     # which is why you need the extra index
-#     plt.xlabel(class_names[train_labels[i][0]])
-# plt.show()
-
-model = build_model()
-
-hist = model.fit_generator(
-                train_generator, 
-                epochs=20, 
-                validation_data=val_generator,
-                workers=3,
-                verbose=1
-            )
-        
-model.save_weights("./bilinear_weights/val_acc_" + hist.history['val_categorical_accuracy'][-1] +"_"+ str(20)+ ".h5")
-    
-
-for layer in model.layers:
-    layer.trainable = True
-
-sgd = keras.optimizers.SGD(lr=1e-3, decay=1e-9, momentum=0.9)
-
-model.compile(loss="categorical_crossentropy", optimizer=sgd, metrics=["categorical_accuracy"])
-
-hist = model.fit_generator(
-                train_generator, 
-                epochs=20, 
-                validation_data=val_generator,
-                workers=3,
-                verbose=1
-            )
-
-model.save('./model_bilin')
-model2 = keras.models.load_model('./model_bilin')
-
-preds = model2.predict_generator(test_generator, verbose=1)
-
-#4/26-27 model training
-#we removed all the layers  instead of removing just the last layer and are retreining vgg
+model_bin_path = os.path.join("bcnn_model_bin")
+model.save(model_bin_path)

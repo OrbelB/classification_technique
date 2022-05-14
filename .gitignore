@@ -4,3 +4,7 @@ Images
 .env
 model_bin
 resnet-dogs
+DogTestImage
+bcnn_model_bin
+bcnn-dogs
+save_at_18

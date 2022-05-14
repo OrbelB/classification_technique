@@ -57,12 +57,12 @@ ds_test = ds_test.map(input_preprocess)
 ds_test = ds_test.batch(batch_size=BATCH_SIZE, drop_remainder=True)
 
 inputs = layers.Input(shape=(IMG_SIZE, IMG_SIZE, 3))
-inputs = layers.RandomFlip("horizontal",
-                      input_shape=(IMG_SIZE,
-                                  IMG_SIZE,
-                                  3))(inputs)
-inputs = layers.RandomRotation(0.1)(inputs)
-inputs = layers.Rescaling(1./255)(inputs)
+# inputs = layers.RandomFlip("horizontal",
+#                       input_shape=(IMG_SIZE,
+#                                   IMG_SIZE,
+#                                   3))(inputs)
+# inputs = layers.RandomRotation(0.1)(inputs)
+# inputs = layers.Rescaling(1./255)(inputs)
 
 base_model = tf.keras.applications.ResNet50(
     weights="imagenet", include_top=False, input_tensor=inputs
