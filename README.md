@@ -2,4 +2,4 @@
 
 
 ## By Orbel B & Marvin H
-Hello World
+A project using ML b-cnns to classify 120 diffrent dog breeds
